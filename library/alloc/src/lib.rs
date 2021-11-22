@@ -195,6 +195,7 @@ mod boxed {
 pub mod borrow;
 pub mod collections;
 pub mod fmt;
+pub mod option;
 pub mod rc;
 pub mod slice;
 pub mod str;
