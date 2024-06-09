@@ -399,7 +399,7 @@ function getItemsBefore(query, parserState, elems, endChar) {
             throw ["Unclosed ", extra];
         }
         // This case can be encountered if `getNextElem` encountered a "stop character"
-        // right from the start. For example if you have `,,` or `<>`. In this case, 
+        // right from the start. For example if you have `,,` or `<>`. In this case,
         // we simply move up the current position to continue the parsing.
         if (posBefore === parserState.pos) {
             parserState.pos += 1;
