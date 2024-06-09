@@ -247,7 +247,7 @@ ${item.displayPath}<span class="${type}">${name}</span>\
             return;
         }
         if (results.query === undefined) {
-            results.query = parseQuery(searchState.input.value);
+            results.query = DocSearch.parseQuery(searchState.input.value);
         }
 
         currentResults = results.query.userQuery;
@@ -378,7 +378,7 @@ ${item.displayPath}<span class="${type}">${name}</span>\
      * @param {boolean} [forced]
      */
     async function search(forced) {
-        const query = parseQuery(searchState.input.value.trim());
+        const query = DocSearch.parseQuery(searchState.input.value.trim());
         let filterCrates = getFilterCrates();
 
         if (!forced && query.userQuery === currentResults) {
@@ -406,7 +406,7 @@ ${item.displayPath}<span class="${type}">${name}</span>\
         updateSearchHistory(buildUrl(query.original, filterCrates));
 
         await showResults(
-            await execQuery(query, filterCrates, window.currentCrate),
+            await docSearch.execQuery(query, filterCrates, window.currentCrate),
             params.go_to_first,
             filterCrates);
     }

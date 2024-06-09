@@ -1732,7 +1732,7 @@ class DocSearch {
      *
      * @return {ParsedQuery}    - The parsed query
      */
-    parseQuery(userQuery) {
+    static parseQuery(userQuery) {
         function itemTypeFromName(typename) {
             const index = itemTypes.findIndex(i => i === typename);
             if (index < 0) {
