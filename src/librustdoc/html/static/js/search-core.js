@@ -282,10 +282,10 @@ function getFilteredNextElem(query, parserState, elems, isInGenerics) {
 }
 
 /**
- * This function parses the next query element until it finds `endChar`, 
+ * This function parses the next query element until it finds `endChar`,
  * calling `getNextElem` to collect each element.
  *
- * If there is no `endChar`, this function will implicitly stop at the end 
+ * If there is no `endChar`, this function will implicitly stop at the end
  * without raising an error.
  *
  * @param {ParsedQuery} query
@@ -398,7 +398,7 @@ function getItemsBefore(query, parserState, elems, endChar) {
         if (endChar !== "" && parserState.pos >= parserState.length) {
             throw ["Unclosed ", extra];
         }
-        // This case can be encountered if `getNextElem` encountered a "stop character" 
+        // This case can be encountered if `getNextElem` encountered a "stop character"
         // right from the start. For example if you have `,,` or `<>`. In this case, 
         // we simply move up the current position to continue the parsing.
         if (posBefore === parserState.pos) {
@@ -750,7 +750,7 @@ function makePrimitiveElement(name, extra) {
 }
 
 /**
- * If we encounter a `"`, then we try to extract the string 
+ * If we encounter a `"`, then we try to extract the string
  * from it until we find another `"`.
  *
  * This function will throw an error in the following cases:
@@ -787,8 +787,8 @@ function getStringElem(query, parserState, isInGenerics) {
 }
 
 /**
- * This function goes through all characters until it reaches an invalid ident 
- * character or the end of the query. It returns the position of the last 
+ * This function goes through all characters until it reaches an invalid ident
+ * character or the end of the query. It returns the position of the last
  * character of the ident.
  *
  * @param {ParserState} parserState
@@ -1221,7 +1221,7 @@ class DocSearch {
      * functions that operate on a small set of data types, so the search index compresses them
      * by encoding function parameter and return types as indexes into an array of names.
      *
-     * Even when a general-purpose compression algorithm is used, this is still a win. 
+     * Even when a general-purpose compression algorithm is used, this is still a win.
      * I checked. https://github.com/rust-lang/rust/pull/98475#issue-1284395985
      *
      * The format for individual function types is encoded in
@@ -1368,9 +1368,9 @@ class DocSearch {
         /**
          * Convert from RawFunctionSearchType to FunctionSearchType.
          *
-         * Crates often have lots of functions in them, and function signatures are sometimes 
-         * complex, so rustdoc uses a pretty tight encoding for them. This function converts it 
-         * to a simpler, object-based encoding so that the actual search code is more readable 
+         * Crates often have lots of functions in them, and function signatures are sometimes
+         * complex, so rustdoc uses a pretty tight encoding for them. This function converts it
+         * to a simpler, object-based encoding so that the actual search code is more readable
          * and easier to debug.
          *
          * The raw function search type format is generated using serde in
@@ -1389,7 +1389,9 @@ class DocSearch {
                 const OUTPUT_DATA = 1;
                 let inputs, output;
                 if (typeof functionSearchType[INPUTS_DATA] === "number") {
-                    inputs = [this.buildItemSearchType(functionSearchType[INPUTS_DATA], lowercasePaths)];
+                    inputs = [
+                        this.buildItemSearchType(functionSearchType[INPUTS_DATA], lowercasePaths)
+                    ];
                 } else {
                     inputs = this.buildItemSearchTypeAll(
                         functionSearchType[INPUTS_DATA],
@@ -1399,7 +1401,10 @@ class DocSearch {
                 if (functionSearchType.length > 1) {
                     if (typeof functionSearchType[OUTPUT_DATA] === "number") {
                         output = [
-                            this.buildItemSearchType(functionSearchType[OUTPUT_DATA], lowercasePaths)
+                            this.buildItemSearchType(
+                                functionSearchType[OUTPUT_DATA],
+                                lowercasePaths,
+                            )
                         ];
                     } else {
                         output = this.buildItemSearchTypeAll(
@@ -2722,7 +2727,8 @@ class DocSearch {
                 if (row.id > 0 && elem.id > 0 && elem.pathWithoutLast.length === 0 &&
                     typePassesFilter(elem.typeFilter, row.ty) && elem.generics.length === 0 &&
                     // special case
-                    elem.id !== this.typeNameIdOfArrayOrSlice && elem.id !== this.typeNameIdOfTupleOrUnit
+                    elem.id !== this.typeNameIdOfArrayOrSlice
+                    && elem.id !== this.typeNameIdOfTupleOrUnit
                     && elem.id !== this.typeNameIdOfHof
                 ) {
                     return row.id === elem.id || checkIfInList(
@@ -2826,7 +2832,8 @@ class DocSearch {
             const aliases = [];
             const crateAliases = [];
             if (filterCrates !== null) {
-                if (this.ALIASES.has(filterCrates) && this.ALIASES.get(filterCrates).has(lowerQuery)) {
+                if (this.ALIASES.has(filterCrates)
+                    && this.ALIASES.get(filterCrates).has(lowerQuery)) {
                     const query_aliases = this.ALIASES.get(filterCrates).get(lowerQuery);
                     for (const alias of query_aliases) {
                         aliases.push(createAliasFromItem(this.searchIndex[alias]));
