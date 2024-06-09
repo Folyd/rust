@@ -276,7 +276,8 @@ class DocSearch {
         }
 
         /**
-         * If we encounter a `"`, then we try to extract the string from it until we find another `"`.
+         * If we encounter a `"`, then we try to extract the string 
+         * from it until we find another `"`.
          *
          * This function will throw an error in the following cases:
          * * There is already another string element.
@@ -488,7 +489,8 @@ class DocSearch {
             }
             const pathSegments = path.split(/(?:::\s*)|(?:\s+(?:::\s*)?)/);
             // In case we only have something like `<p>`, there is no name.
-            if (pathSegments.length === 0 || (pathSegments.length === 1 && pathSegments[0] === "")) {
+            if (pathSegments.length === 0
+                || (pathSegments.length === 1 && pathSegments[0] === "")) {
                 if (generics.length > 0 || prevIs(parserState, ">")) {
                     throw ["Found generics without a path"];
                 } else {
@@ -537,8 +539,9 @@ class DocSearch {
         }
 
         /**
-         * This function goes through all characters until it reaches an invalid ident character or the
-         * end of the query. It returns the position of the last character of the ident.
+         * This function goes through all characters until it reaches an invalid ident 
+         * character or the end of the query. It returns the position of the last 
+         * character of the ident.
          *
          * @param {ParserState} parserState
          *
@@ -682,7 +685,8 @@ class DocSearch {
                         throw ["Type parameter ", "=", ` cannot be within ${friendlyName} `, name];
                     }
                 }
-                if (name === "()" && !foundSeparator && generics.length === 1 && typeFilter === null) {
+                if (name === "()" && !foundSeparator && generics.length === 1
+                    && typeFilter === null) {
                     elems.push(generics[0]);
                 } else if (name === "()" && generics.length === 1 && generics[0].name === "->") {
                     // `primitive:(a -> b)` parser to `primitive:"->"<output=b, (a,)>`
@@ -823,11 +827,11 @@ class DocSearch {
         }
 
         /**
-         * This function parses the next query element until it finds `endChar`, calling `getNextElem`
-         * to collect each element.
+         * This function parses the next query element until it finds `endChar`, 
+         * calling `getNextElem` to collect each element.
          *
-         * If there is no `endChar`, this function will implicitly stop at the end without raising an
-         * error.
+         * If there is no `endChar`, this function will implicitly stop at the end 
+         * without raising an error.
          *
          * @param {ParsedQuery} query
          * @param {ParserState} parserState
@@ -939,9 +943,9 @@ class DocSearch {
                 if (endChar !== "" && parserState.pos >= parserState.length) {
                     throw ["Unclosed ", extra];
                 }
-                // This case can be encountered if `getNextElem` encountered a "stop character" right
-                // from the start. For example if you have `,,` or `<>`. In this case, we simply move up
-                // the current position to continue the parsing.
+                // This case can be encountered if `getNextElem` encountered a "stop character" 
+                // right from the start. For example if you have `,,` or `<>`. In this case, 
+                // we simply move up the current position to continue the parsing.
                 if (posBefore === parserState.pos) {
                     parserState.pos += 1;
                 }
@@ -950,8 +954,8 @@ class DocSearch {
             if (parserState.pos >= parserState.length && endChar !== "") {
                 throw ["Unclosed ", extra];
             }
-            // We are either at the end of the string or on the `endChar` character, let's move forward
-            // in any case.
+            // We are either at the end of the string or on the `endChar` character, let's move
+            // forward in any case.
             parserState.pos += 1;
 
             if (hofParameters) {
@@ -959,7 +963,8 @@ class DocSearch {
                 // If you want a one-tuple with a HOF in it, write `((a -> b),)`.
                 foundSeparator = false;
                 // HOFs can't have directly nested bindings.
-                if ([...elems, ...hofParameters].some(x => x.bindingName) || parserState.isInBinding) {
+                if ([...elems, ...hofParameters].some(x => x.bindingName)
+                    || parserState.isInBinding) {
                     throw ["Unexpected ", "=", " within ", "->"];
                 }
                 // HOFs are represented the same way closures are.
@@ -1009,8 +1014,8 @@ class DocSearch {
          * functions that operate on a small set of data types, so the search index compresses them
          * by encoding function parameter and return types as indexes into an array of names.
          *
-         * Even when a general-purpose compression algorithm is used, this is still a win. I checked.
-         * https://github.com/rust-lang/rust/pull/98475#issue-1284395985
+         * Even when a general-purpose compression algorithm is used, this is still a win. 
+         * I checked. https://github.com/rust-lang/rust/pull/98475#issue-1284395985
          *
          * The format for individual function types is encoded in
          * librustdoc/html/render/mod.rs: impl Serialize for RenderType
@@ -1172,9 +1177,10 @@ class DocSearch {
         /**
          * Convert from RawFunctionSearchType to FunctionSearchType.
          *
-         * Crates often have lots of functions in them, and function signatures are sometimes complex,
-         * so rustdoc uses a pretty tight encoding for them. This function converts it to a simpler,
-         * object-based encoding so that the actual search code is more readable and easier to debug.
+         * Crates often have lots of functions in them, and function signatures are sometimes 
+         * complex, so rustdoc uses a pretty tight encoding for them. This function converts it 
+         * to a simpler, object-based encoding so that the actual search code is more readable 
+         * and easier to debug.
          *
          * The raw function search type format is generated using serde in
          * librustdoc/html/render/mod.rs: IndexItemFunctionType::write_to_string
@@ -1201,7 +1207,9 @@ class DocSearch {
                 }
                 if (functionSearchType.length > 1) {
                     if (typeof functionSearchType[OUTPUT_DATA] === "number") {
-                        output = [buildItemSearchType(functionSearchType[OUTPUT_DATA], lowercasePaths)];
+                        output = [
+                            buildItemSearchType(functionSearchType[OUTPUT_DATA], lowercasePaths)
+                        ];
                     } else {
                         output = buildItemSearchTypeAll(
                             functionSearchType[OUTPUT_DATA],
@@ -1669,14 +1677,16 @@ class DocSearch {
                         path,
                         descShard,
                         descIndex,
-                        exactPath: itemReexports.has(i) ? itemPaths.get(itemReexports.get(i)) : path,
+                        exactPath: itemReexports.has(i) ?
+                            itemPaths.get(itemReexports.get(i)) : path,
                         parent: itemParentIdxs[i] > 0 ? paths[itemParentIdxs[i] - 1] : undefined,
                         type,
                         id,
                         word,
                         normalizedName: word.indexOf("_") === -1 ? word : word.replace(/_/g, ""),
                         bitIndex,
-                        implDisambiguator: implDisambiguator.has(i) ? implDisambiguator.get(i) : null,
+                        implDisambiguator: implDisambiguator.has(i) ?
+                            implDisambiguator.get(i) : null,
                     };
                     id += 1;
                     searchIndex.push(row);
@@ -1811,7 +1821,8 @@ class DocSearch {
                         }
                         throw ["Unexpected ", c, " (did you mean ", "->", "?)"];
                     } else if (parserState.pos > 0) {
-                        throw ["Unexpected ", c, " after ", parserState.userQuery[parserState.pos - 1]];
+                        throw ["Unexpected ", c, " after ",
+                            parserState.userQuery[parserState.pos - 1]];
                     }
                     throw ["Unexpected ", c];
                 } else if (c === " ") {
@@ -1942,7 +1953,11 @@ class DocSearch {
          *
          * @return {ResultsTable}
          */
-        function createQueryResults(results_in_args, results_returned, results_others, parsedQuery) {
+        function createQueryResults(
+            results_in_args,
+            results_returned,
+            results_others,
+            parsedQuery) {
             return {
                 "in_args": results_in_args,
                 "returned": results_returned,
