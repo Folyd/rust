@@ -5,7 +5,7 @@
 "use strict";
 
 
-(function () {
+(function() {
     const longItemTypes = [
         "keyword",
         "primitive type",
@@ -102,7 +102,7 @@
 
         if (elem &&
             elem.value !== "all crates" &&
-            rawSearchIndex.has(elem.value)
+            window.searchIndex.has(elem.value)
         ) {
             return elem.value;
         }
@@ -590,7 +590,7 @@ ${item.displayPath}<span class="${type}">${name}</span>\
     if (typeof window !== "undefined") {
         registerSearchEvents();
         if (window.searchState.getQueryStringParams().search) {
-            search()
+            search();
         }
     }
 
@@ -598,7 +598,7 @@ ${item.displayPath}<span class="${type}">${name}</span>\
         if (typeof window !== "undefined") {
             window.docSearch = new window.DocSearch(rawSearchIndex);
         } else if (typeof exports !== "undefined") {
-            exports.docSearch = new exports.DocSearch(rawSearchIndex);;
+            exports.docSearch = new exports.DocSearch(rawSearchIndex);
         }
     }
 

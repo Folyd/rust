@@ -1106,7 +1106,7 @@ class DocSearch {
         /**
          *  @type {Uint32Array}
          */
-        this.functionTypeFingerprint = new Uint32Array((id + 1) * 4);
+        this.functionTypeFingerprint = null;
         /**
          * Map from normalized type names to integers. Used to make type search
          * more efficient.
@@ -1182,7 +1182,7 @@ class DocSearch {
         /**
          *  @type {Array<Row>}
          */
-        this.searchIndex = buildIndex(rawSearchIndex);
+        this.searchIndex = this.buildIndex(rawSearchIndex);
     }
 
     /**
@@ -1360,6 +1360,91 @@ class DocSearch {
     }
 
     /**
+     * Type fingerprints allow fast, approximate matching of types.
+     *
+     * This algo creates a compact representation of the type set using a Bloom filter.
+     * This fingerprint is used three ways:
+     *
+     * - It accelerates the matching algorithm by checking the function fingerprint against the
+     *   query fingerprint. If any bits are set in the query but not in the function, it can't
+     *   match.
+     *
+     * - The fourth section has the number of distinct items in the set.
+     *   This is the distance function, used for filtering and for sorting.
+     *
+     * [^1]: Distance is the relatively naive metric of counting the number of distinct items in
+     * the function that are not present in the query.
+     *
+     * @param {FunctionType|QueryElement} type - a single type
+     * @param {Uint32Array} output - write the fingerprint to this data structure: uses 128 bits
+     * @param {Set<number>} fps - Set of distinct items
+     */
+    buildFunctionTypeFingerprint(type, output, fps) {
+        let input = type.id;
+        // All forms of `[]`/`()`/`->` get collapsed down to one thing in the bloom filter.
+        // Differentiating between arrays and slices, if the user asks for it, is
+        // still done in the matching algorithm.
+        if (input === this.typeNameIdOfArray || input === this.typeNameIdOfSlice) {
+            input = this.typeNameIdOfArrayOrSlice;
+        }
+        if (input === this.typeNameIdOfTuple || input === this.typeNameIdOfUnit) {
+            input = this.typeNameIdOfTupleOrUnit;
+        }
+        if (input === this.typeNameIdOfFn || input === this.typeNameIdOfFnMut ||
+            input === this.typeNameIdOfFnOnce) {
+            input = this.typeNameIdOfHof;
+        }
+        // http://burtleburtle.net/bob/hash/integer.html
+        // ~~ is toInt32. It's used before adding, so
+        // the number stays in safe integer range.
+        const hashint1 = k => {
+            k = (~~k + 0x7ed55d16) + (k << 12);
+            k = (k ^ 0xc761c23c) ^ (k >>> 19);
+            k = (~~k + 0x165667b1) + (k << 5);
+            k = (~~k + 0xd3a2646c) ^ (k << 9);
+            k = (~~k + 0xfd7046c5) + (k << 3);
+            return (k ^ 0xb55a4f09) ^ (k >>> 16);
+        };
+        const hashint2 = k => {
+            k = ~k + (k << 15);
+            k ^= k >>> 12;
+            k += k << 2;
+            k ^= k >>> 4;
+            k = Math.imul(k, 2057);
+            return k ^ (k >> 16);
+        };
+        if (input !== null) {
+            const h0a = hashint1(input);
+            const h0b = hashint2(input);
+            // Less Hashing, Same Performance: Building a Better Bloom Filter
+            // doi=10.1.1.72.2442
+            const h1a = ~~(h0a + Math.imul(h0b, 2));
+            const h1b = ~~(h0a + Math.imul(h0b, 3));
+            const h2a = ~~(h0a + Math.imul(h0b, 4));
+            const h2b = ~~(h0a + Math.imul(h0b, 5));
+            output[0] |= (1 << (h0a % 32)) | (1 << (h1b % 32));
+            output[1] |= (1 << (h1a % 32)) | (1 << (h2b % 32));
+            output[2] |= (1 << (h2a % 32)) | (1 << (h0b % 32));
+            fps.add(input);
+        }
+        for (const g of type.generics) {
+            this.buildFunctionTypeFingerprint(g, output, fps);
+        }
+        const fb = {
+            id: null,
+            ty: 0,
+            generics: this.EMPTY_GENERICS_ARRAY,
+            bindings: this.EMPTY_BINDINGS_MAP,
+        };
+        for (const [k, v] of type.bindings.entries()) {
+            fb.id = k;
+            fb.generics = v;
+            this.buildFunctionTypeFingerprint(fb, output, fps);
+        }
+        output[3] = fps.size;
+    }
+
+    /**
      * Convert raw search index into in-memory search index.
      *
      * @param {[string, RawSearchIndexCrate][]} rawSearchIndex
@@ -1390,7 +1475,7 @@ class DocSearch {
                 let inputs, output;
                 if (typeof functionSearchType[INPUTS_DATA] === "number") {
                     inputs = [
-                        this.buildItemSearchType(functionSearchType[INPUTS_DATA], lowercasePaths)
+                        this.buildItemSearchType(functionSearchType[INPUTS_DATA], lowercasePaths),
                     ];
                 } else {
                     inputs = this.buildItemSearchTypeAll(
@@ -1404,7 +1489,7 @@ class DocSearch {
                             this.buildItemSearchType(
                                 functionSearchType[OUTPUT_DATA],
                                 lowercasePaths,
-                            )
+                            ),
                         ];
                     } else {
                         output = this.buildItemSearchTypeAll(
@@ -1426,94 +1511,9 @@ class DocSearch {
                     inputs, output, where_clause,
                 };
             };
-        }
+        };
 
-        /**
-         * Type fingerprints allow fast, approximate matching of types.
-         *
-         * This algo creates a compact representation of the type set using a Bloom filter.
-         * This fingerprint is used three ways:
-         *
-         * - It accelerates the matching algorithm by checking the function fingerprint against the
-         *   query fingerprint. If any bits are set in the query but not in the function, it can't
-         *   match.
-         *
-         * - The fourth section has the number of distinct items in the set.
-         *   This is the distance function, used for filtering and for sorting.
-         *
-         * [^1]: Distance is the relatively naive metric of counting the number of distinct items in
-         * the function that are not present in the query.
-         *
-         * @param {FunctionType|QueryElement} type - a single type
-         * @param {Uint32Array} output - write the fingerprint to this data structure: uses 128 bits
-         * @param {Set<number>} fps - Set of distinct items
-         */
-        const buildFunctionTypeFingerprint = (type, output, fps) => {
-            let input = type.id;
-            // All forms of `[]`/`()`/`->` get collapsed down to one thing in the bloom filter.
-            // Differentiating between arrays and slices, if the user asks for it, is
-            // still done in the matching algorithm.
-            if (input === this.typeNameIdOfArray || input === this.typeNameIdOfSlice) {
-                input = this.typeNameIdOfArrayOrSlice;
-            }
-            if (input === this.typeNameIdOfTuple || input === this.typeNameIdOfUnit) {
-                input = this.typeNameIdOfTupleOrUnit;
-            }
-            if (input === this.typeNameIdOfFn || input === this.typeNameIdOfFnMut ||
-                input === this.typeNameIdOfFnOnce) {
-                input = this.typeNameIdOfHof;
-            }
-            // http://burtleburtle.net/bob/hash/integer.html
-            // ~~ is toInt32. It's used before adding, so
-            // the number stays in safe integer range.
-            const hashint1 = k => {
-                k = (~~k + 0x7ed55d16) + (k << 12);
-                k = (k ^ 0xc761c23c) ^ (k >>> 19);
-                k = (~~k + 0x165667b1) + (k << 5);
-                k = (~~k + 0xd3a2646c) ^ (k << 9);
-                k = (~~k + 0xfd7046c5) + (k << 3);
-                return (k ^ 0xb55a4f09) ^ (k >>> 16);
-            };
-            const hashint2 = k => {
-                k = ~k + (k << 15);
-                k ^= k >>> 12;
-                k += k << 2;
-                k ^= k >>> 4;
-                k = Math.imul(k, 2057);
-                return k ^ (k >> 16);
-            };
-            if (input !== null) {
-                const h0a = hashint1(input);
-                const h0b = hashint2(input);
-                // Less Hashing, Same Performance: Building a Better Bloom Filter
-                // doi=10.1.1.72.2442
-                const h1a = ~~(h0a + Math.imul(h0b, 2));
-                const h1b = ~~(h0a + Math.imul(h0b, 3));
-                const h2a = ~~(h0a + Math.imul(h0b, 4));
-                const h2b = ~~(h0a + Math.imul(h0b, 5));
-                output[0] |= (1 << (h0a % 32)) | (1 << (h1b % 32));
-                output[1] |= (1 << (h1a % 32)) | (1 << (h2b % 32));
-                output[2] |= (1 << (h2a % 32)) | (1 << (h0b % 32));
-                fps.add(input);
-            }
-            for (const g of type.generics) {
-                buildFunctionTypeFingerprint(g, output, fps);
-            }
-            const fb = {
-                id: null,
-                ty: 0,
-                generics: this.EMPTY_GENERICS_ARRAY,
-                bindings: this.EMPTY_BINDINGS_MAP,
-            };
-            for (const [k, v] of type.bindings.entries()) {
-                fb.id = k;
-                fb.generics = v;
-                buildFunctionTypeFingerprint(fb, output, fps);
-            }
-            output[3] = fps.size;
-        }
-
-        let searchIndex = [];
+        const searchIndex = [];
         const charA = "A".charCodeAt(0);
         let currentIndex = 0;
         let id = 0;
@@ -1526,7 +1526,7 @@ class DocSearch {
             // does, too
             id += crate.t.length + 1;
         }
-
+        this.functionTypeFingerprint = new Uint32Array((id + 1) * 4);
         // This loop actually generates the search item indexes, including
         // normalized names, type signature objects and fingerprints, and aliases.
         id = 0;
@@ -1664,14 +1664,14 @@ class DocSearch {
                         const fp = this.functionTypeFingerprint.subarray(id * 4, (id + 1) * 4);
                         const fps = new Set();
                         for (const t of type.inputs) {
-                            buildFunctionTypeFingerprint(t, fp, fps);
+                            this.buildFunctionTypeFingerprint(t, fp, fps);
                         }
                         for (const t of type.output) {
-                            buildFunctionTypeFingerprint(t, fp, fps);
+                            this.buildFunctionTypeFingerprint(t, fp, fps);
                         }
                         for (const w of type.where_clause) {
                             for (const t of w) {
-                                buildFunctionTypeFingerprint(t, fp, fps);
+                                this.buildFunctionTypeFingerprint(t, fp, fps);
                             }
                         }
                     }
@@ -2079,7 +2079,7 @@ class DocSearch {
                 }
             }
             return out;
-        }
+        };
 
         /**
          * This function takes a result map, and sorts it by various criteria, including edit
@@ -2090,7 +2090,7 @@ class DocSearch {
          * @param {string} preferredCrate
          * @returns {Promise<[ResultObject]>}
          */
-        const sortResults = async (results, isType, preferredCrate) => {
+        const sortResults = async(results, isType, preferredCrate) => {
             const userQuery = parsedQuery.userQuery;
             const result_list = [];
             for (const result of results.values()) {
@@ -2193,7 +2193,7 @@ class DocSearch {
             });
 
             return transformResults(result_list);
-        }
+        };
 
         /**
          * This function checks if a list of search query `queryElems` can all be found in the
@@ -2540,7 +2540,7 @@ class DocSearch {
                 }
                 return true;
             }
-        }
+        };
         /**
          * This function checks the associated type bindings. Any that aren't matched get converted
          * to generics, and this function returns an array of the function's generics with these
@@ -2741,7 +2741,7 @@ class DocSearch {
                 }
             }
             return unifyFunctionTypes([row], [elem], whereClause, mgens, null, unboxingDepth);
-        }
+        };
 
         /**
          * Compute an "edit distance" that ignores missing path elements.
@@ -2825,7 +2825,7 @@ class DocSearch {
             };
         }
 
-        const handleAliases = async (ret, query, filterCrates, currentCrate) => {
+        const handleAliases = async(ret, query, filterCrates, currentCrate) => {
             const lowerQuery = query.toLowerCase();
             // We separate aliases and crate aliases because we want to have current crate
             // aliases to be before the others in the displayed results.
@@ -2892,7 +2892,7 @@ class DocSearch {
                 alias.desc = crateDescs[i];
             });
             crateAliases.forEach(pushFunc);
-        }
+        };
 
         /**
          * This function adds the given result into the provided `results` map if it matches the
@@ -3106,7 +3106,7 @@ class DocSearch {
                 return null;
             }
             return this.functionTypeFingerprint[(fullId * 4) + 3];
-        }
+        };
 
 
         const innerRunQuery = () => {
@@ -3141,7 +3141,7 @@ class DocSearch {
                     let match = null;
                     let matchDist = maxEditDistance + 1;
                     let matchName = "";
-                    for (const [name, { id, assocOnly }] of typeNameIdMap) {
+                    for (const [name, { id, assocOnly }] of this.typeNameIdMap) {
                         const dist = editDistance(name, elem.normalizedPathLast, maxEditDistance);
                         if (dist <= matchDist && dist <= maxEditDistance &&
                             (isAssocType || !assocOnly)) {
@@ -3220,22 +3220,23 @@ class DocSearch {
                         return [this.typeNameIdMap.get(name).id, constraints];
                     }),
                 );
-            }
+            };
 
             const fps = new Set();
             for (const elem of parsedQuery.elems) {
                 convertNameToId(elem);
-                buildFunctionTypeFingerprint(elem, parsedQuery.typeFingerprint, fps);
+                this.buildFunctionTypeFingerprint(elem, parsedQuery.typeFingerprint, fps);
             }
             for (const elem of parsedQuery.returned) {
                 convertNameToId(elem);
-                buildFunctionTypeFingerprint(elem, parsedQuery.typeFingerprint, fps);
+                this.buildFunctionTypeFingerprint(elem, parsedQuery.typeFingerprint, fps);
             }
 
             if (parsedQuery.foundElems === 1 && parsedQuery.returned.length === 0) {
                 if (parsedQuery.elems.length === 1) {
                     const elem = parsedQuery.elems[0];
-                    for (let i = 0, nSearchIndex = searchIndex.length; i < nSearchIndex; ++i) {
+                    const length = this.searchIndex.length;
+                    for (let i = 0, nSearchIndex = length; i < nSearchIndex; ++i) {
                         // It means we want to check for this element everywhere (in names, args and
                         // returned).
                         handleSingleArg(
@@ -3266,7 +3267,7 @@ class DocSearch {
                 };
                 parsedQuery.elems.sort(sortQ);
                 parsedQuery.returned.sort(sortQ);
-                for (let i = 0, nSearchIndex = searchIndex.length; i < nSearchIndex; ++i) {
+                for (let i = 0, nSearchIndex = this.searchIndex.length; i < nSearchIndex; ++i) {
                     handleArgs(this.searchIndex[i], i, results_others);
                 }
             }
