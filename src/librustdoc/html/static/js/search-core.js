@@ -7,7 +7,7 @@
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/toSpliced
 if (!Array.prototype.toSpliced) {
     // Can't use arrow functions, because we want `this`
-    Array.prototype.toSpliced = function () {
+    Array.prototype.toSpliced = function() {
         const me = this.slice();
         Array.prototype.splice.apply(me, arguments);
         return me;
@@ -1183,6 +1183,10 @@ class DocSearch {
          *  @type {Array<Row>}
          */
         this.searchIndex = this.buildIndex(rawSearchIndex);
+    }
+
+    static getItemType(ty) {
+        return itemTypes[ty];
     }
 
     /**
@@ -3135,9 +3139,9 @@ class DocSearch {
              */
             const convertNameToId = (elem, isAssocType) => {
                 const loweredName = elem.pathLast.toLowerCase();
-                if (typeNameIdMap.has(loweredName) &&
-                    (isAssocType || !typeNameIdMap.get(loweredName).assocOnly)) {
-                    elem.id = typeNameIdMap.get(loweredName).id;
+                if (this.typeNameIdMap.has(loweredName) &&
+                    (isAssocType || !this.typeNameIdMap.get(loweredName).assocOnly)) {
+                    elem.id = this.typeNameIdMap.get(loweredName).id;
                 } else if (!parsedQuery.literalSearch) {
                     let match = null;
                     let matchDist = maxEditDistance + 1;

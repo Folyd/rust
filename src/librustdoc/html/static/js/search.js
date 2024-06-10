@@ -6,6 +6,8 @@
 
 
 (function() {
+    let rawSearchIndex;
+    let docSearch;
     const longItemTypes = [
         "keyword",
         "primitive type",
@@ -143,7 +145,7 @@
 
             for (const item of array) {
                 const name = item.name;
-                const type = itemTypes[item.ty];
+                const type = window.DocSearch.getItemType(item.ty);
                 const longType = longItemTypes[item.ty];
                 const typeName = longType.length !== 0 ? `${longType}` : "?";
 
@@ -247,7 +249,7 @@ ${item.displayPath}<span class="${type}">${name}</span>\
             return;
         }
         if (results.query === undefined) {
-            results.query = DocSearch.parseQuery(searchState.input.value);
+            results.query = window.DocSearch.parseQuery(searchState.input.value);
         }
 
         currentResults = results.query.userQuery;
@@ -378,7 +380,7 @@ ${item.displayPath}<span class="${type}">${name}</span>\
      * @param {boolean} [forced]
      */
     async function search(forced) {
-        const query = DocSearch.parseQuery(searchState.input.value.trim());
+        const query = window.DocSearch.parseQuery(searchState.input.value.trim());
         let filterCrates = getFilterCrates();
 
         if (!forced && query.userQuery === currentResults) {
@@ -595,8 +597,9 @@ ${item.displayPath}<span class="${type}">${name}</span>\
     }
 
     function initSearch(rawSearchIndex) {
+        rawSearchIndex = rawSearchIndex;
         if (typeof window !== "undefined") {
-            window.docSearch = new window.DocSearch(rawSearchIndex);
+            docSearch = new window.DocSearch(rawSearchIndex);
         } else if (typeof exports !== "undefined") {
             exports.docSearch = new exports.DocSearch(rawSearchIndex);
         }
