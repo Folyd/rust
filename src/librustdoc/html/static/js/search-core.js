@@ -3315,8 +3315,8 @@ class DocSearch {
     }
 }
 
-if (typeof exports !== "undefined") {
-    exports.DocSearch = DocSearch;
-} else {
+if (typeof window !== "undefined") {
     window.DocSearch = DocSearch;
+} else if (typeof exports !== "undefined") {
+    exports.DocSearch = DocSearch;
 }

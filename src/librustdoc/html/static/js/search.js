@@ -596,8 +596,8 @@ ${item.displayPath}<span class="${type}">${name}</span>\
         }
     }
 
-    function initSearch(rawSearchIndex) {
-        rawSearchIndex = rawSearchIndex;
+    function initSearch(searchIndx) {
+        rawSearchIndex = searchIndx;
         if (typeof window !== "undefined") {
             docSearch = new window.DocSearch(rawSearchIndex);
         } else if (typeof exports !== "undefined") {
