@@ -1,5 +1,5 @@
 // ignore-tidy-filelength
-/* global searchState */
+/* global searchState, exports */
 
 "use strict";
 
