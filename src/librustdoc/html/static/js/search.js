@@ -131,11 +131,11 @@
     }
 
     /**
-  * Render a set of search results for a single tab.
-  * @param {Array<?>}    array   - The search results for this tab
-  * @param {ParsedQuery} query
-  * @param {boolean}     display - True if this is the active tab
-  */
+     * Render a set of search results for a single tab.
+     * @param {Array<?>}    array   - The search results for this tab
+     * @param {ParsedQuery} query
+     * @param {boolean}     display - True if this is the active tab
+     */
     async function addTab(array, query, display) {
         const extraClass = display ? " active" : "";
 
@@ -206,9 +206,8 @@ ${item.displayPath}<span class="${type}">${name}</span>\
         // digits are the same width. \u{2007} is a Unicode space character
         // that is defined to be the same width as a digit.
         const fmtNbElems =
-            nbElems < 10 ? `\u{2007}(${nbElems})\u{2007}\u{2007}` :
-                nbElems < 100 ? `\u{2007}(${nbElems})\u{2007}` :
-                    `\u{2007}(${nbElems})`;
+            nbElems < 10  ? `\u{2007}(${nbElems})\u{2007}\u{2007}` :
+            nbElems < 100 ? `\u{2007}(${nbElems})\u{2007}` : `\u{2007}(${nbElems})`;
         if (searchState.currentTab === tabNb) {
             return "<button class=\"selected\">" + text +
                 "<span class=\"count\">" + fmtNbElems + "</span></button>";
