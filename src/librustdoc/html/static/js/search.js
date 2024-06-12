@@ -3914,6 +3914,10 @@ function initSearch(searchIndx) {
     }
 }
 
+if (typeof exports !== "undefined") {
+    exports.initSearch = initSearch;
+}
+
 if (typeof window !== "undefined") {
     window.initSearch = initSearch;
     if (window.searchIndex !== undefined) {
