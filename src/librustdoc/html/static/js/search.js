@@ -75,14 +75,14 @@ const NO_TYPE_FILTER = -1;
  */
 
 /*
-* This function was translated, mostly line-for-line, from
-* https://github.com/rust-lang/rust/blob/ff4b772f805ec1e/compiler/rustc_span/src/edit_distance.rs
-*
-* The current implementation is the restricted Damerau-Levenshtein algorithm. It is restricted
-* because it does not permit modifying characters that have already been transposed. The specific
-* algorithm should not matter to the caller of the methods, which is why it is not noted in the
-* documentation.
-*/
+ * This function was translated, mostly line-for-line, from
+ * https://github.com/rust-lang/rust/blob/ff4b772f805ec1e/compiler/rustc_span/src/edit_distance.rs
+ *
+ * The current implementation is the restricted Damerau-Levenshtein algorithm. It is restricted
+ * because it does not permit modifying characters that have already been transposed. The specific
+ * algorithm should not matter to the caller of the methods, which is why it is not noted in the
+ * documentation.
+ */
 const editDistanceState = {
     current: [],
     prev: [],
