@@ -3911,6 +3911,7 @@ function initSearch(searchIndx) {
         docSearch = new DocSearch(rawSearchIndex);
     } else if (typeof exports !== "undefined") {
         exports.docSearch = new DocSearch(rawSearchIndex);
+        exports.parseQuery = DocSearch.parseQuery;
     }
 }
 

@@ -438,15 +438,15 @@ function loadSearchJS(doc_folder, resource_suffix) {
     const docSearch = searchModule.docSearch;
     return {
         doSearch: function(queryStr, filterCrate, currentCrate) {
-            return docSearch.execQuery(docSearch.parseQuery(queryStr),
+            return docSearch.execQuery(searchModule.parseQuery(queryStr),
                 filterCrate, currentCrate);
         },
         getCorrections: function(queryStr, filterCrate, currentCrate) {
-            const parsedQuery = docSearch.parseQuery(queryStr);
+            const parsedQuery = searchModule.parseQuery(queryStr);
             docSearch.execQuery(parsedQuery, filterCrate, currentCrate);
             return parsedQuery.correction;
         },
-        parseQuery: docSearch.parseQuery,
+        parseQuery: searchModule.parseQuery,
     };
 }
 
