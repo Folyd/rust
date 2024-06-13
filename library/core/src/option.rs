@@ -654,6 +654,32 @@ impl<T> Option<T> {
         !self.is_some()
     }
 
+    /// Returns `true` if the option is a [`None`] or the value inside of it matches a predicate.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #![feature(is_none_or)]
+    ///
+    /// let x: Option<u32> = Some(2);
+    /// assert_eq!(x.is_none_or(|x| x > 1), true);
+    ///
+    /// let x: Option<u32> = Some(0);
+    /// assert_eq!(x.is_none_or(|x| x > 1), false);
+    ///
+    /// let x: Option<u32> = None;
+    /// assert_eq!(x.is_none_or(|x| x > 1), true);
+    /// ```
+    #[must_use]
+    #[inline]
+    #[unstable(feature = "is_none_or", issue = "126383")]
+    pub fn is_none_or(self, f: impl FnOnce(T) -> bool) -> bool {
+        match self {
+            None => true,
+            Some(x) => f(x),
+        }
+    }
+
     /////////////////////////////////////////////////////////////////////////
     // Adapter for working with references
     /////////////////////////////////////////////////////////////////////////
@@ -1724,7 +1750,7 @@ impl<T> Option<T> {
     /// assert_eq!(prev, Some(43));
     /// ```
     #[inline]
-    #[stable(feature = "option_take_if", since = "CURRENT_RUSTC_VERSION")]
+    #[stable(feature = "option_take_if", since = "1.80.0")]
     pub fn take_if<P>(&mut self, predicate: P) -> Option<T>
     where
         P: FnOnce(&mut T) -> bool,

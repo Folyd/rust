@@ -5,23 +5,27 @@ use std::path::Path;
 use crate::{command, cwd, env_var, set_host_rpath};
 
 /// Construct a new `rustc` invocation.
+#[track_caller]
 pub fn rustc() -> Rustc {
     Rustc::new()
 }
 
 /// Construct a new `rustc` aux-build invocation.
+#[track_caller]
 pub fn aux_build() -> Rustc {
     Rustc::new_aux_build()
 }
 
 /// A `rustc` invocation builder.
 #[derive(Debug)]
+#[must_use]
 pub struct Rustc {
     cmd: Command,
 }
 
 crate::impl_common_helpers!(Rustc);
 
+#[track_caller]
 fn setup_common() -> Command {
     let rustc = env_var("RUSTC");
     let mut cmd = Command::new(rustc);
@@ -34,12 +38,14 @@ impl Rustc {
     // `rustc` invocation constructor methods
 
     /// Construct a new `rustc` invocation.
+    #[track_caller]
     pub fn new() -> Self {
         let cmd = setup_common();
         Self { cmd }
     }
 
     /// Construct a new `rustc` invocation with `aux_build` preset (setting `--crate-type=lib`).
+    #[track_caller]
     pub fn new_aux_build() -> Self {
         let mut cmd = setup_common();
         cmd.arg("--crate-type=lib");
@@ -100,9 +106,22 @@ impl Rustc {
         self
     }
 
+    //Adjust the backtrace level, displaying more detailed information at higher levels.
+    pub fn set_backtrace_level<R: AsRef<OsStr>>(&mut self, level: R) -> &mut Self {
+        self.cmd.env("RUST_BACKTRACE", level);
+        self
+    }
+
     /// Specify path to the output file. Equivalent to `-o`` in rustc.
     pub fn output<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
         self.cmd.arg("-o");
+        self.cmd.arg(path.as_ref());
+        self
+    }
+
+    /// Specify path to the output directory. Equivalent to `--out-dir`` in rustc.
+    pub fn out_dir<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
+        self.cmd.arg("--out-dir");
         self.cmd.arg(path.as_ref());
         self
     }
@@ -129,6 +148,24 @@ impl Rustc {
     pub fn incremental<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
         let mut arg = OsString::new();
         arg.push("-Cincremental=");
+        arg.push(path.as_ref());
+        self.cmd.arg(&arg);
+        self
+    }
+
+    /// Specify directory path used for profile generation
+    pub fn profile_generate<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
+        let mut arg = OsString::new();
+        arg.push("-Cprofile-generate=");
+        arg.push(path.as_ref());
+        self.cmd.arg(&arg);
+        self
+    }
+
+    /// Specify directory path used for profile usage
+    pub fn profile_use<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
+        let mut arg = OsString::new();
+        arg.push("-Cprofile-use=");
         arg.push(path.as_ref());
         self.cmd.arg(&arg);
         self

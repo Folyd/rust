@@ -3597,7 +3597,7 @@ impl<'tcx> TypeErrCtxt<'_, 'tcx> {
         &self,
         obligation: &PredicateObligation<'tcx>,
         err: &mut Diag<'_>,
-        trait_ref: &ty::PolyTraitRef<'tcx>,
+        trait_ref: ty::PolyTraitRef<'tcx>,
     ) {
         let rhs_span = match obligation.cause.code() {
             ObligationCauseCode::BinOp { rhs_span: Some(span), rhs_is_lit, .. } if *rhs_is_lit => {
@@ -4587,6 +4587,46 @@ impl<'tcx> TypeErrCtxt<'_, 'tcx> {
             _ => "/* value */".to_string(),
         })
     }
+
+    fn suggest_add_result_as_return_type(
+        &self,
+        obligation: &PredicateObligation<'tcx>,
+        err: &mut Diag<'_>,
+        trait_pred: ty::PolyTraitPredicate<'tcx>,
+    ) {
+        if ObligationCauseCode::QuestionMark != *obligation.cause.code().peel_derives() {
+            return;
+        }
+
+        let node = self.tcx.hir_node_by_def_id(obligation.cause.body_id);
+        if let hir::Node::Item(item) = node
+            && let hir::ItemKind::Fn(sig, _, body_id) = item.kind
+            && let hir::FnRetTy::DefaultReturn(ret_span) = sig.decl.output
+            && self.tcx.is_diagnostic_item(sym::FromResidual, trait_pred.def_id())
+            && trait_pred.skip_binder().trait_ref.args.type_at(0).is_unit()
+            && let ty::Adt(def, _) = trait_pred.skip_binder().trait_ref.args.type_at(1).kind()
+            && self.tcx.is_diagnostic_item(sym::Result, def.did())
+        {
+            let body = self.tcx.hir().body(body_id);
+            let mut sugg_spans =
+                vec![(ret_span, " -> Result<(), Box<dyn std::error::Error>>".to_string())];
+
+            if let hir::ExprKind::Block(b, _) = body.value.kind
+                && b.expr.is_none()
+            {
+                sugg_spans.push((
+                    // The span will point to the closing curly brace `}` of the block.
+                    b.span.shrink_to_hi().with_lo(b.span.hi() - BytePos(1)),
+                    "\n    Ok(())\n}".to_string(),
+                ));
+            }
+            err.multipart_suggestion_verbose(
+                format!("consider adding return type"),
+                sugg_spans,
+                Applicability::MaybeIncorrect,
+            );
+        }
+    }
 }
 
 /// Add a hint to add a missing borrow or remove an unnecessary one.
@@ -4822,14 +4862,13 @@ impl<'a, 'hir> hir::intravisit::Visitor<'hir> for ReplaceImplTraitVisitor<'a> {
 pub(super) fn get_explanation_based_on_obligation<'tcx>(
     tcx: TyCtxt<'tcx>,
     obligation: &PredicateObligation<'tcx>,
-    trait_ref: ty::PolyTraitRef<'tcx>,
-    trait_predicate: &ty::PolyTraitPredicate<'tcx>,
+    trait_predicate: ty::PolyTraitPredicate<'tcx>,
     pre_message: String,
 ) -> String {
     if let ObligationCauseCode::MainFunctionType = obligation.cause.code() {
         "consider using `()`, or a `Result`".to_owned()
     } else {
-        let ty_desc = match trait_ref.skip_binder().self_ty().kind() {
+        let ty_desc = match trait_predicate.self_ty().skip_binder().kind() {
             ty::FnDef(_, _) => Some("fn item"),
             ty::Closure(_, _) => Some("closure"),
             _ => None,
@@ -4854,7 +4893,7 @@ pub(super) fn get_explanation_based_on_obligation<'tcx>(
             format!(
                 "{pre_message}the trait `{}` is not implemented for{desc} `{}`{post}",
                 trait_predicate.print_modifiers_and_trait_path(),
-                tcx.short_ty_string(trait_ref.skip_binder().self_ty(), &mut None),
+                tcx.short_ty_string(trait_predicate.self_ty().skip_binder(), &mut None),
             )
         } else {
             // "the trait bound `T: !Send` is not satisfied" reads better than "`!Send` is

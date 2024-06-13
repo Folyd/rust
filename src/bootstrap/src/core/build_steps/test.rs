@@ -308,7 +308,7 @@ impl Step for Cargo {
         // Forcibly disable tests using nightly features since any changes to
         // those features won't be able to land.
         cargo.env("CARGO_TEST_DISABLE_NIGHTLY", "1");
-        cargo.env("PATH", &path_for_cargo(builder, compiler));
+        cargo.env("PATH", path_for_cargo(builder, compiler));
 
         #[cfg(feature = "build-metrics")]
         builder.metrics.begin_test_suite(
@@ -1101,6 +1101,8 @@ impl Step for Tidy {
     /// Once tidy passes, this step also runs `fmt --check` if tests are being run
     /// for the `dev` or `nightly` channels.
     fn run(self, builder: &Builder<'_>) {
+        builder.build.update_submodule(Path::new("src/tools/rustc-perf"));
+
         let mut cmd = builder.tool_cmd(Tool::Tidy);
         cmd.arg(&builder.src);
         cmd.arg(&builder.initial_cargo);
@@ -2557,7 +2559,7 @@ fn prepare_cargo_test(
         cargo.arg("-p").arg(krate);
     }
 
-    cargo.arg("--").args(&builder.config.test_args()).args(libtest_args);
+    cargo.arg("--").args(builder.config.test_args()).args(libtest_args);
     if !builder.config.verbose_tests {
         cargo.arg("--quiet");
     }
@@ -3106,7 +3108,7 @@ impl Step for TierCheck {
             &[],
         );
         cargo.arg(builder.src.join("src/doc/rustc/src/platform-support.md"));
-        cargo.arg(&builder.rustc(self.compiler));
+        cargo.arg(builder.rustc(self.compiler));
         if builder.is_verbose() {
             cargo.arg("--verbose");
         }

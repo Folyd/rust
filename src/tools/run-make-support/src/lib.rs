@@ -7,7 +7,9 @@ pub mod cc;
 pub mod clang;
 mod command;
 pub mod diff;
-pub mod llvm_readobj;
+mod drop_bomb;
+pub mod fs_wrapper;
+pub mod llvm;
 pub mod run;
 pub mod rustc;
 pub mod rustdoc;
@@ -16,6 +18,7 @@ use std::env;
 use std::ffi::OsString;
 use std::fs;
 use std::io;
+use std::panic;
 use std::path::{Path, PathBuf};
 
 pub use gimli;
@@ -26,11 +29,15 @@ pub use wasmparser;
 pub use cc::{cc, extra_c_flags, extra_cxx_flags, Cc};
 pub use clang::{clang, Clang};
 pub use diff::{diff, Diff};
-pub use llvm_readobj::{llvm_readobj, LlvmReadobj};
-pub use run::{cmd, run, run_fail};
+pub use llvm::{
+    llvm_filecheck, llvm_profdata, llvm_readobj, LlvmFilecheck, LlvmProfdata, LlvmReadobj,
+};
+pub use run::{cmd, run, run_fail, run_with_args};
 pub use rustc::{aux_build, rustc, Rustc};
 pub use rustdoc::{bare_rustdoc, rustdoc, Rustdoc};
 
+#[track_caller]
+#[must_use]
 pub fn env_var(name: &str) -> String {
     match env::var(name) {
         Ok(v) => v,
@@ -38,6 +45,8 @@ pub fn env_var(name: &str) -> String {
     }
 }
 
+#[track_caller]
+#[must_use]
 pub fn env_var_os(name: &str) -> OsString {
     match env::var_os(name) {
         Some(v) => v,
@@ -46,42 +55,85 @@ pub fn env_var_os(name: &str) -> OsString {
 }
 
 /// `TARGET`
+#[must_use]
 pub fn target() -> String {
     env_var("TARGET")
 }
 
 /// Check if target is windows-like.
+#[must_use]
 pub fn is_windows() -> bool {
     target().contains("windows")
 }
 
 /// Check if target uses msvc.
+#[must_use]
 pub fn is_msvc() -> bool {
     target().contains("msvc")
 }
 
 /// Check if target uses macOS.
+#[must_use]
 pub fn is_darwin() -> bool {
     target().contains("darwin")
 }
 
+#[track_caller]
+#[must_use]
 pub fn python_command() -> Command {
     let python_path = env_var("PYTHON");
     Command::new(python_path)
 }
 
+#[track_caller]
+#[must_use]
 pub fn htmldocck() -> Command {
     let mut python = python_command();
     python.arg(source_root().join("src/etc/htmldocck.py"));
     python
 }
 
+/// Returns the path for a local test file.
+pub fn path<P: AsRef<Path>>(p: P) -> PathBuf {
+    cwd().join(p.as_ref())
+}
+
 /// Path to the root rust-lang/rust source checkout.
+#[must_use]
 pub fn source_root() -> PathBuf {
     env_var("SOURCE_ROOT").into()
 }
 
+/// Creates a new symlink to a path on the filesystem, adjusting for Windows or Unix.
+#[cfg(target_family = "windows")]
+pub fn create_symlink<P: AsRef<Path>, Q: AsRef<Path>>(original: P, link: Q) {
+    if link.as_ref().exists() {
+        std::fs::remove_dir(link.as_ref()).unwrap();
+    }
+    use std::os::windows::fs;
+    fs::symlink_file(original.as_ref(), link.as_ref()).expect(&format!(
+        "failed to create symlink {:?} for {:?}",
+        link.as_ref().display(),
+        original.as_ref().display(),
+    ));
+}
+
+/// Creates a new symlink to a path on the filesystem, adjusting for Windows or Unix.
+#[cfg(target_family = "unix")]
+pub fn create_symlink<P: AsRef<Path>, Q: AsRef<Path>>(original: P, link: Q) {
+    if link.as_ref().exists() {
+        std::fs::remove_dir(link.as_ref()).unwrap();
+    }
+    use std::os::unix::fs;
+    fs::symlink(original.as_ref(), link.as_ref()).expect(&format!(
+        "failed to create symlink {:?} for {:?}",
+        link.as_ref().display(),
+        original.as_ref().display(),
+    ));
+}
+
 /// Construct the static library name based on the platform.
+#[must_use]
 pub fn static_lib_name(name: &str) -> String {
     // See tools.mk (irrelevant lines omitted):
     //
@@ -106,6 +158,7 @@ pub fn static_lib_name(name: &str) -> String {
 }
 
 /// Construct the dynamic library name based on the platform.
+#[must_use]
 pub fn dynamic_lib_name(name: &str) -> String {
     // See tools.mk (irrelevant lines omitted):
     //
@@ -132,6 +185,7 @@ pub fn dynamic_lib_name(name: &str) -> String {
     }
 }
 
+#[must_use]
 pub fn dynamic_lib_extension() -> &'static str {
     if is_darwin() {
         "dylib"
@@ -142,17 +196,20 @@ pub fn dynamic_lib_extension() -> &'static str {
     }
 }
 
-/// Construct a rust library (rlib) name.
+/// Generate the name a rust library (rlib) would have.
+#[must_use]
 pub fn rust_lib_name(name: &str) -> String {
     format!("lib{name}.rlib")
 }
 
 /// Construct the binary name based on platform.
+#[must_use]
 pub fn bin_name(name: &str) -> String {
     if is_windows() { format!("{name}.exe") } else { name.to_string() }
 }
 
 /// Return the current working directory.
+#[must_use]
 pub fn cwd() -> PathBuf {
     env::current_dir().unwrap()
 }
@@ -160,16 +217,15 @@ pub fn cwd() -> PathBuf {
 /// Use `cygpath -w` on a path to get a Windows path string back. This assumes that `cygpath` is
 /// available on the platform!
 #[track_caller]
+#[must_use]
 pub fn cygpath_windows<P: AsRef<Path>>(path: P) -> String {
-    let caller_location = std::panic::Location::caller();
-    let caller_line_number = caller_location.line();
-
+    let caller = panic::Location::caller();
     let mut cygpath = Command::new("cygpath");
     cygpath.arg("-w");
     cygpath.arg(path.as_ref());
-    let output = cygpath.command_output();
+    let output = cygpath.run();
     if !output.status().success() {
-        handle_failed_output(&cygpath, output, caller_line_number);
+        handle_failed_output(&cygpath, output, caller.line());
     }
     // cygpath -w can attach a newline
     output.stdout_utf8().trim().to_string()
@@ -177,14 +233,13 @@ pub fn cygpath_windows<P: AsRef<Path>>(path: P) -> String {
 
 /// Run `uname`. This assumes that `uname` is available on the platform!
 #[track_caller]
+#[must_use]
 pub fn uname() -> String {
-    let caller_location = std::panic::Location::caller();
-    let caller_line_number = caller_location.line();
-
+    let caller = panic::Location::caller();
     let mut uname = Command::new("uname");
-    let output = uname.command_output();
+    let output = uname.run();
     if !output.status().success() {
-        handle_failed_output(&uname, output, caller_line_number);
+        handle_failed_output(&uname, output, caller.line());
     }
     output.stdout_utf8()
 }
@@ -221,15 +276,15 @@ pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) {
     fn copy_dir_all_inner(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
         let dst = dst.as_ref();
         if !dst.is_dir() {
-            fs::create_dir_all(&dst)?;
+            std::fs::create_dir_all(&dst)?;
         }
-        for entry in fs::read_dir(src)? {
+        for entry in std::fs::read_dir(src)? {
             let entry = entry?;
             let ty = entry.file_type()?;
             if ty.is_dir() {
                 copy_dir_all_inner(entry.path(), dst.join(entry.file_name()))?;
             } else {
-                fs::copy(entry.path(), dst.join(entry.file_name()))?;
+                std::fs::copy(entry.path(), dst.join(entry.file_name()))?;
             }
         }
         Ok(())
@@ -248,13 +303,6 @@ pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) {
 
 /// Check that all files in `dir1` exist and have the same content in `dir2`. Panic otherwise.
 pub fn recursive_diff(dir1: impl AsRef<Path>, dir2: impl AsRef<Path>) {
-    fn read_file(path: &Path) -> Vec<u8> {
-        match fs::read(path) {
-            Ok(c) => c,
-            Err(e) => panic!("Failed to read `{}`: {:?}", path.display(), e),
-        }
-    }
-
     let dir2 = dir2.as_ref();
     read_dir(dir1, |entry_path| {
         let entry_name = entry_path.file_name().unwrap();
@@ -262,8 +310,8 @@ pub fn recursive_diff(dir1: impl AsRef<Path>, dir2: impl AsRef<Path>) {
             recursive_diff(&entry_path, &dir2.join(entry_name));
         } else {
             let path2 = dir2.join(entry_name);
-            let file1 = read_file(&entry_path);
-            let file2 = read_file(&path2);
+            let file1 = fs_wrapper::read(&entry_path);
+            let file2 = fs_wrapper::read(&path2);
 
             // We don't use `assert_eq!` because they are `Vec<u8>`, so not great for display.
             // Why not using String? Because there might be minified files or even potentially
@@ -279,7 +327,7 @@ pub fn recursive_diff(dir1: impl AsRef<Path>, dir2: impl AsRef<Path>) {
 }
 
 pub fn read_dir<F: Fn(&Path)>(dir: impl AsRef<Path>, callback: F) {
-    for entry in fs::read_dir(dir).unwrap() {
+    for entry in fs_wrapper::read_dir(dir) {
         callback(&entry.unwrap().path());
     }
 }
@@ -364,12 +412,6 @@ macro_rules! impl_common_helpers {
                 self
             }
 
-            /// Clear all environmental variables.
-            pub fn env_var(&mut self) -> &mut Self {
-                self.cmd.env_clear();
-                self
-            }
-
             /// Generic command argument provider. Prefer specific helper methods if possible.
             /// Note that for some executables, arguments might be platform specific. For C/C++
             /// compilers, arguments might be platform *and* compiler specific.
@@ -398,7 +440,7 @@ macro_rules! impl_common_helpers {
             where
                 I: FnOnce(&::std::process::Command),
             {
-                inspector(&self.cmd);
+                self.cmd.inspect(inspector);
                 self
             }
 
@@ -415,7 +457,7 @@ macro_rules! impl_common_helpers {
             }
 
             /// Set the path where the command will be run.
-            pub fn current_dir<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
+            pub fn current_dir<P: AsRef<::std::path::Path>>(&mut self, path: P) -> &mut Self {
                 self.cmd.current_dir(path);
                 self
             }

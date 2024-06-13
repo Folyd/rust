@@ -32,6 +32,15 @@ impl<'tcx> TypeErrCtxt<'_, 'tcx> {
                         diag.note("no two closures, even if identical, have the same type");
                         diag.help("consider boxing your closure and/or using it as a trait object");
                     }
+                    (ty::Coroutine(def_id1, ..), ty::Coroutine(def_id2, ..))
+                        if self.tcx.coroutine_is_async(def_id1)
+                            && self.tcx.coroutine_is_async(def_id2) =>
+                    {
+                        diag.note("no two async blocks, even if identical, have the same type");
+                        diag.help(
+                            "consider pinning your async block and casting it to a trait object",
+                        );
+                    }
                     (ty::Alias(ty::Opaque, ..), ty::Alias(ty::Opaque, ..)) => {
                         // Issue #63167
                         diag.note("distinct uses of `impl Trait` result in different opaque types");
@@ -537,7 +546,7 @@ impl<T> Trait<T> for X {
         for pred in hir_generics.bounds_for_param(def_id) {
             if self.constrain_generic_bound_associated_type_structured_suggestion(
                 diag,
-                &trait_ref,
+                trait_ref,
                 pred.bounds,
                 assoc,
                 assoc_args,
@@ -706,7 +715,7 @@ fn foo(&self) -> Self::T { String::new() }
 
             self.constrain_generic_bound_associated_type_structured_suggestion(
                 diag,
-                &trait_ref,
+                trait_ref,
                 opaque_hir_ty.bounds,
                 assoc,
                 assoc_args,
@@ -860,7 +869,7 @@ fn foo(&self) -> Self::T { String::new() }
     fn constrain_generic_bound_associated_type_structured_suggestion(
         &self,
         diag: &mut Diag<'_>,
-        trait_ref: &ty::TraitRef<'tcx>,
+        trait_ref: ty::TraitRef<'tcx>,
         bounds: hir::GenericBounds<'_>,
         assoc: ty::AssocItem,
         assoc_args: &[ty::GenericArg<'tcx>],

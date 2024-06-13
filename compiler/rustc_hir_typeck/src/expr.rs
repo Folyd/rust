@@ -1342,14 +1342,11 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 Ok(method)
             }
             Err(error) => {
-                if segment.ident.name != kw::Empty {
-                    if let Some(err) =
-                        self.report_method_error(expr.hir_id, rcvr_t, error, expected, false)
-                    {
-                        err.emit();
-                    }
+                if segment.ident.name == kw::Empty {
+                    span_bug!(rcvr.span, "empty method name")
+                } else {
+                    Err(self.report_method_error(expr.hir_id, rcvr_t, error, expected, false))
                 }
-                Err(())
             }
         };
 
@@ -1560,7 +1557,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
         // If the length is 0, we don't create any elements, so we don't copy any. If the length is 1, we
         // don't copy that one element, we move it. Only check for Copy if the length is larger.
-        if count.try_eval_target_usize(tcx, self.param_env).map_or(true, |len| len > 1) {
+        if count.try_eval_target_usize(tcx, self.param_env).is_none_or(|len| len > 1) {
             let lang_item = self.tcx.require_lang_item(LangItem::Copy, None);
             let code = traits::ObligationCauseCode::RepeatElementCopy {
                 is_constable,

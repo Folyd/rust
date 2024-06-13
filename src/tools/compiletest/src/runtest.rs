@@ -15,7 +15,7 @@ use crate::errors::{self, Error, ErrorKind};
 use crate::header::TestProps;
 use crate::json;
 use crate::read2::{read2_abbreviated, Truncated};
-use crate::util::{add_dylib_path, copy_dir_all, dylib_env_var, logv, PathBufExt};
+use crate::util::{add_dylib_path, copy_dir_all, dylib_env_var, logv, static_regex, PathBufExt};
 use crate::ColorConfig;
 use colored::Colorize;
 use miropt_test_tools::{files_for_miropt_test, MiroptTest, MiroptTestFile};
@@ -47,14 +47,6 @@ use debugger::DebuggerCommands;
 
 #[cfg(test)]
 mod tests;
-
-macro_rules! static_regex {
-    ($re:literal) => {{
-        static RE: ::std::sync::OnceLock<::regex::Regex> = ::std::sync::OnceLock::new();
-        RE.get_or_init(|| ::regex::Regex::new($re).unwrap())
-    }};
-}
-use static_regex;
 
 const FAKE_SRC_BASE: &str = "fake-test-src-base";
 
@@ -3550,6 +3542,10 @@ impl<'test> TestCx<'test> {
             .env("HOST_RPATH_DIR", cwd.join(&self.config.compile_lib_path))
             .env("TARGET_RPATH_DIR", cwd.join(&self.config.run_lib_path))
             .env("LLVM_COMPONENTS", &self.config.llvm_components);
+
+        // In test code we want to be very pedantic about values being silently discarded that are
+        // annotated with `#[must_use]`.
+        cmd.arg("-Dunused_must_use");
 
         if std::env::var_os("COMPILETEST_FORCE_STAGE0").is_some() {
             let mut stage0_sysroot = build_root.clone();

@@ -1,8 +1,10 @@
+// tidy-alphabetical-start
 #![feature(assert_matches)]
 #![feature(box_patterns)]
 #![feature(const_type_name)]
 #![feature(cow_is_borrowed)]
 #![feature(decl_macro)]
+#![feature(if_let_guard)]
 #![feature(impl_trait_in_assoc_type)]
 #![feature(is_sorted)]
 #![feature(let_chains)]
@@ -12,7 +14,7 @@
 #![feature(round_char_boundary)]
 #![feature(try_blocks)]
 #![feature(yeet_expr)]
-#![feature(if_let_guard)]
+// tidy-alphabetical-end
 
 #[macro_use]
 extern crate tracing;
@@ -55,7 +57,6 @@ mod remove_place_mention;
 // This pass is public to allow external drivers to perform MIR cleanup
 mod add_subtyping_projections;
 pub mod cleanup_post_borrowck;
-mod const_debuginfo;
 mod copy_prop;
 mod coroutine;
 mod cost_checker;
@@ -106,6 +107,7 @@ mod check_alignment;
 pub mod simplify;
 mod simplify_branches;
 mod simplify_comparison_integral;
+mod single_use_consts;
 mod sroa;
 mod unreachable_enum_branching;
 mod unreachable_prop;
@@ -593,7 +595,7 @@ fn run_optimization_passes<'tcx>(tcx: TyCtxt<'tcx>, body: &mut Body<'tcx>) {
             &gvn::GVN,
             &simplify::SimplifyLocals::AfterGVN,
             &dataflow_const_prop::DataflowConstProp,
-            &const_debuginfo::ConstDebugInfo,
+            &single_use_consts::SingleUseConsts,
             &o1(simplify_branches::SimplifyConstCondition::AfterConstProp),
             &jump_threading::JumpThreading,
             &early_otherwise_branch::EarlyOtherwiseBranch,
