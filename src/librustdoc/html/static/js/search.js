@@ -3898,13 +3898,6 @@ function updateCrate(ev) {
     search(true);
 }
 
-if (typeof window !== "undefined") {
-    registerSearchEvents();
-    if (window.searchState.getQueryStringParams().search) {
-        search();
-    }
-}
-
 function initSearch(searchIndx) {
     rawSearchIndex = searchIndx;
     if (typeof window !== "undefined") {
@@ -3928,5 +3921,12 @@ if (typeof window !== "undefined") {
     // Running in Node, not a browser. Run initSearch just to produce the
     // exports.
     initSearch(new Map());
+}
+
+if (typeof window !== "undefined") {
+    registerSearchEvents();
+    if (window.searchState.getQueryStringParams().search) {
+        search();
+    }
 }
 })();
