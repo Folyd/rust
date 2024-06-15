@@ -3723,9 +3723,9 @@ async function search(forced) {
 }
 
 /**
-     * Callback for when the search form is submitted.
-     * @param {Event} [e] - The event that triggered this call, if any
-     */
+ * Callback for when the search form is submitted.
+ * @param {Event} [e] - The event that triggered this call, if any
+ */
 function onSearchSubmit(e) {
     e.preventDefault();
     searchState.clearInputTimeout();
@@ -3903,7 +3903,8 @@ function initSearch(searchIndx) {
     if (typeof window !== "undefined") {
         docSearch = new DocSearch(rawSearchIndex);
     } else if (typeof exports !== "undefined") {
-        exports.docSearch = new DocSearch(rawSearchIndex);
+        docSearch = new DocSearch(rawSearchIndex);
+        exports.docSearch = docSearch;
         exports.parseQuery = DocSearch.parseQuery;
     }
 }
