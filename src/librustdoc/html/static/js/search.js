@@ -1986,7 +1986,8 @@ class DocSearch {
                     name + "/index.html";
             } else if (type === "import") {
                 displayPath = item.path + "::";
-                href = this.rootPath + item.path.replace(/::/g, "/") + "/index.html#reexport." + name;
+                href = this.rootPath + item.path.replace(/::/g, "/") +
+                    "/index.html#reexport." + name;
             } else if (type === "primitive" || type === "keyword") {
                 displayPath = "";
                 href = this.rootPath + path.replace(/::/g, "/") +
@@ -2030,7 +2031,7 @@ class DocSearch {
                     "/" + type + "." + name + ".html";
             }
             return [displayPath, href, `${exactPath}::${name}`];
-        }
+        };
 
         function pathSplitter(path) {
             const tmp = "<span>" + path.replace(/::/g, "::</span><span>");
