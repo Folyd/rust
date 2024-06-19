@@ -1097,7 +1097,7 @@ class RoaringBitmapBits {
 
 
 class DocSearch {
-    constructor(rawSearchIndex) {
+    constructor(rawSearchIndex, rootPath) {
         /**
          * @type {Map<String, RoaringBitmap>}
          */
@@ -1118,6 +1118,7 @@ class DocSearch {
          */
         this.typeNameIdMap = new Map();
         this.ALIASES = new Map();
+        this.rootPath = rootPath;
 
         /**
          * Special type name IDs for searching by array.
@@ -1971,7 +1972,7 @@ class DocSearch {
             };
         }
 
-        function buildHrefAndPath(item) {
+        const buildHrefAndPath = item => {
             let displayPath;
             let href;
             const type = itemTypes[item.ty];
@@ -1981,18 +1982,18 @@ class DocSearch {
 
             if (type === "mod") {
                 displayPath = path + "::";
-                href = ROOT_PATH + path.replace(/::/g, "/") + "/" +
+                href = this.rootPath + path.replace(/::/g, "/") + "/" +
                     name + "/index.html";
             } else if (type === "import") {
                 displayPath = item.path + "::";
-                href = ROOT_PATH + item.path.replace(/::/g, "/") + "/index.html#reexport." + name;
+                href = this.rootPath + item.path.replace(/::/g, "/") + "/index.html#reexport." + name;
             } else if (type === "primitive" || type === "keyword") {
                 displayPath = "";
-                href = ROOT_PATH + path.replace(/::/g, "/") +
+                href = this.rootPath + path.replace(/::/g, "/") +
                     "/" + type + "." + name + ".html";
             } else if (type === "externcrate") {
                 displayPath = "";
-                href = ROOT_PATH + name + "/index.html";
+                href = this.rootPath + name + "/index.html";
             } else if (item.parent !== undefined) {
                 const myparent = item.parent;
                 let anchor = type + "." + name;
@@ -2019,13 +2020,13 @@ class DocSearch {
                 if (item.implDisambiguator !== null) {
                     anchor = item.implDisambiguator + "/" + anchor;
                 }
-                href = ROOT_PATH + path.replace(/::/g, "/") +
+                href = this.rootPath + path.replace(/::/g, "/") +
                     "/" + pageType +
                     "." + pageName +
                     ".html#" + anchor;
             } else {
                 displayPath = item.path + "::";
-                href = ROOT_PATH + item.path.replace(/::/g, "/") +
+                href = this.rootPath + item.path.replace(/::/g, "/") +
                     "/" + type + "." + name + ".html";
             }
             return [displayPath, href, `${exactPath}::${name}`];
@@ -3901,9 +3902,9 @@ function updateCrate(ev) {
 function initSearch(searchIndx) {
     rawSearchIndex = searchIndx;
     if (typeof window !== "undefined") {
-        docSearch = new DocSearch(rawSearchIndex);
+        docSearch = new DocSearch(rawSearchIndex, ROOT_PATH);
     } else if (typeof exports !== "undefined") {
-        docSearch = new DocSearch(rawSearchIndex);
+        docSearch = new DocSearch(rawSearchIndex, ROOT_PATH);
         exports.docSearch = docSearch;
         exports.parseQuery = DocSearch.parseQuery;
     }
