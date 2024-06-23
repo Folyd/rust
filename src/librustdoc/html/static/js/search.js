@@ -1097,7 +1097,7 @@ class RoaringBitmapBits {
 
 
 class DocSearch {
-    constructor(rawSearchIndex, rootPath) {
+    constructor(rawSearchIndex, rootPath, searchState) {
         /**
          * @type {Map<String, RoaringBitmap>}
          */
@@ -1119,6 +1119,7 @@ class DocSearch {
         this.typeNameIdMap = new Map();
         this.ALIASES = new Map();
         this.rootPath = rootPath;
+        this.searchState = searchState;
 
         /**
          * Special type name IDs for searching by array.
@@ -1729,7 +1730,7 @@ class DocSearch {
                 }
             }
             currentIndex += itemTypes.length;
-            searchState.descShards.set(crate, descShardList);
+            this.searchState.descShards.set(crate, descShardList);
         }
         // Drop the (rather large) hash table used for reusing function items
         this.TYPES_POOL = new Map();
@@ -2869,7 +2870,7 @@ class DocSearch {
 
             const fetchDesc = alias => {
                 return this.searchIndexEmptyDesc.get(alias.crate).contains(alias.bitIndex) ?
-                    "" : searchState.loadDesc(alias);
+                    "" : this.searchState.loadDesc(alias);
             };
             const [crateDescs, descs] = await Promise.all([
                 Promise.all(crateAliases.map(fetchDesc)),
@@ -3302,7 +3303,7 @@ class DocSearch {
             const descs = await Promise.all(list.map(result => {
                 return this.searchIndexEmptyDesc.get(result.crate).contains(result.bitIndex) ?
                     "" :
-                    searchState.loadDesc(result);
+                    this.searchState.loadDesc(result);
             }));
             for (const [i, result] of list.entries()) {
                 result.desc = descs[i];
@@ -3903,9 +3904,9 @@ function updateCrate(ev) {
 function initSearch(searchIndx) {
     rawSearchIndex = searchIndx;
     if (typeof window !== "undefined") {
-        docSearch = new DocSearch(rawSearchIndex, ROOT_PATH);
+        docSearch = new DocSearch(rawSearchIndex, ROOT_PATH, searchState);
     } else if (typeof exports !== "undefined") {
-        docSearch = new DocSearch(rawSearchIndex, ROOT_PATH);
+        docSearch = new DocSearch(rawSearchIndex, ROOT_PATH, searchState);
         exports.docSearch = docSearch;
         exports.parseQuery = DocSearch.parseQuery;
     }
